@@ -2,14 +2,17 @@
  * API Service — connects frontend to ML service and Firebase Functions.
  *
  * Each function first attempts the real API, and falls back to the
- * built-in demo logic if the service is unreachable.
+ * built-in demo logic if the service is unreachable. This ensures
+ * the UI always works, whether or not the backend is running.
  */
+import { buildFeatureVector, validateFeatures } from "../utils/featureBuilder";
+import { mapPriorityToSeverity } from "../utils/severity";
 
 // ─── Configuration ───────────────────────────────────────────
 const ML_SERVICE_URL =
   import.meta.env.VITE_ML_SERVICE_URL || "http://localhost:8000";
 const FUNCTIONS_URL =
-  import.meta.env.VITE_FUNCTIONS_URL || "http://localhost:5001/ignisia-57522/us-central1";
+  import.meta.env.VITE_FUNCTIONS_URL || "http://localhost:5001/golden-hour-triage/us-central1";
 
 const DELAY = () => new Promise((r) => setTimeout(r, 800 + Math.random() * 600));
 
@@ -17,7 +20,7 @@ const DELAY = () => new Promise((r) => setTimeout(r, 800 + Math.random() * 600))
 const severityLabels = ['GREEN', 'YELLOW', 'ORANGE', 'RED', 'BLACK'];
 const severityNames = ['Minor', 'Delayed', 'Urgent', 'Immediate', 'Deceased'];
 
-export function calculateSeverityFromVitals(vitals) {
+function calculateSeverityFromVitals(vitals) {
   let score = 0;
   const { heartRate, spo2, respiratoryRate, systolicBP, gcs, pain, temperature, glucose } = vitals;
 
@@ -47,7 +50,7 @@ export function calculateSeverityFromVitals(vitals) {
   return Math.min(score, 100);
 }
 
-export function getSeverityLevel(score) {
+function getSeverityLevel(score) {
   if (score >= 80) return { level: 4, label: 'BLACK', name: 'Deceased/Expectant', color: '#1F2937' };
   if (score >= 60) return { level: 3, label: 'RED', name: 'Immediate', color: '#DC2626' };
   if (score >= 40) return { level: 2, label: 'ORANGE', name: 'Urgent', color: '#D97706' };
@@ -55,7 +58,98 @@ export function getSeverityLevel(score) {
   return { level: 0, label: 'GREEN', name: 'Minor', color: '#059669' };
 }
 
-// ─── Feature importance builder ──────────────────────────────
+// ─── predictPatient ──────────────────────────────────────────
+/**
+ * Predict patient severity.
+ * Attempts ML service first, then falls back to local rule-based logic.
+ */
+export async function predictPatient(patientData) {
+  // Build feature vector for ML service
+  const features = buildFeatureVector(patientData);
+  const validation = validateFeatures(features);
+
+  // Try real ML service
+  try {
+    const response = await fetch(`${ML_SERVICE_URL}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ features }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (response.ok) {
+      const mlResult = await response.json();
+
+      // Map ML response to the format expected by existing UI
+      const severity = mapPriorityToSeverity(mlResult.priority);
+      const severityScore = Math.round(mlResult.confidence * 100);
+
+      const featureImportance = buildFeatureImportance(patientData);
+
+      return {
+        severityScore,
+        severity,
+        icuNeeded: mlResult.needs_icu,
+        ventilatorNeeded: mlResult.needs_ventilator,
+        specialistNeeded: severity.level >= 2,
+        confidence: Math.round(mlResult.confidence * 100),
+        featureImportance,
+        timestamp: new Date().toISOString(),
+        modelVersion: "v2.4.1-golden-hour",
+        source: "ml-service",
+      };
+    }
+  } catch (err) {
+    console.warn("ML service unavailable, using fallback:", err.message);
+  }
+
+  // Fallback: local rule-based prediction
+  return fallbackPredict(patientData);
+}
+
+/**
+ * Fallback prediction using local rules (always works offline).
+ */
+async function fallbackPredict(patientData) {
+  await DELAY();
+
+  const vitals = {
+    heartRate: patientData.heartRate || 80,
+    spo2: patientData.spo2 || 98,
+    respiratoryRate: patientData.respiratoryRate || 16,
+    systolicBP: patientData.systolicBP || 120,
+    gcs: patientData.gcs || 15,
+    pain: patientData.pain || 3,
+    temperature: patientData.temperature || 37,
+    glucose: patientData.glucose || 100,
+  };
+
+  const score = calculateSeverityFromVitals(vitals);
+  const severity = getSeverityLevel(score);
+
+  const icuNeeded = score >= 55;
+  const ventilatorNeeded = vitals.spo2 < 90 || vitals.respiratoryRate > 28;
+  const specialistNeeded = score >= 45;
+
+  const featureImportance = buildFeatureImportance(patientData);
+
+  return {
+    severityScore: score,
+    severity,
+    icuNeeded,
+    ventilatorNeeded,
+    specialistNeeded,
+    confidence: Math.round(78 + Math.random() * 18),
+    featureImportance,
+    timestamp: new Date().toISOString(),
+    modelVersion: "v2.4.1-golden-hour",
+    source: "fallback",
+  };
+}
+
+/**
+ * Build feature importance array from patient vitals.
+ */
 function buildFeatureImportance(patientData) {
   const vitals = {
     heartRate: patientData.heartRate || 80,
@@ -84,89 +178,6 @@ function buildFeatureImportance(patientData) {
     ...f,
     importance: Math.round((f.importance / totalImportance) * 100),
   }));
-}
-
-// ─── predictPatient ──────────────────────────────────────────
-export async function predictPatient(patientData) {
-  // Try real ML service
-  try {
-    const features = [
-      parseFloat(patientData.heartRate) || 80,
-      parseFloat(patientData.spo2) || 98,
-      parseFloat(patientData.respiratoryRate) || 16,
-      parseFloat(patientData.systolicBP) || 120,
-      parseFloat(patientData.gcs) || 15,
-    ];
-
-    const response = await fetch(`${ML_SERVICE_URL}/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features }),
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (response.ok) {
-      const mlResult = await response.json();
-      const priorityMap = {
-        LOW: { level: 0, label: 'GREEN', name: 'Minor', color: '#059669' },
-        MODERATE: { level: 1, label: 'YELLOW', name: 'Delayed', color: '#EAB308' },
-        HIGH: { level: 2, label: 'ORANGE', name: 'Urgent', color: '#D97706' },
-        EMERGENCY: { level: 3, label: 'RED', name: 'Immediate', color: '#DC2626' },
-        CRITICAL: { level: 4, label: 'BLACK', name: 'Deceased/Expectant', color: '#1F2937' },
-      };
-      const severity = priorityMap[mlResult.priority] || priorityMap.MODERATE;
-      const severityScore = Math.round(mlResult.confidence * 100);
-
-      return {
-        severityScore,
-        severity,
-        icuNeeded: mlResult.needs_icu,
-        ventilatorNeeded: mlResult.needs_ventilator,
-        specialistNeeded: severity.level >= 2,
-        confidence: Math.round(mlResult.confidence * 100),
-        featureImportance: buildFeatureImportance(patientData),
-        timestamp: new Date().toISOString(),
-        modelVersion: "v2.4.1-golden-hour",
-        source: "ml-service",
-      };
-    }
-  } catch (err) {
-    console.warn("ML service unavailable, using fallback:", err.message);
-  }
-
-  // Fallback: local rule-based prediction
-  return fallbackPredict(patientData);
-}
-
-async function fallbackPredict(patientData) {
-  await DELAY();
-
-  const vitals = {
-    heartRate: patientData.heartRate || 80,
-    spo2: patientData.spo2 || 98,
-    respiratoryRate: patientData.respiratoryRate || 16,
-    systolicBP: patientData.systolicBP || 120,
-    gcs: patientData.gcs || 15,
-    pain: patientData.pain || 3,
-    temperature: patientData.temperature || 37,
-    glucose: patientData.glucose || 100,
-  };
-
-  const score = calculateSeverityFromVitals(vitals);
-  const severity = getSeverityLevel(score);
-
-  return {
-    severityScore: score,
-    severity,
-    icuNeeded: score >= 55,
-    ventilatorNeeded: vitals.spo2 < 90 || vitals.respiratoryRate > 28,
-    specialistNeeded: score >= 45,
-    confidence: Math.round(78 + Math.random() * 18),
-    featureImportance: buildFeatureImportance(patientData),
-    timestamp: new Date().toISOString(),
-    modelVersion: "v2.4.1-golden-hour",
-    source: "fallback",
-  };
 }
 
 // ─── DEMO HOSPITALS ──────────────────────────────────────────
@@ -209,7 +220,12 @@ const DEMO_HOSPITALS = [
 ];
 
 // ─── routePatient ────────────────────────────────────────────
+/**
+ * Route patient to the best hospital.
+ * Tries Firebase Functions first, falls back to local scoring.
+ */
 export async function routePatient(predictionResult) {
+  // Try Firebase Functions
   try {
     const response = await fetch(`${FUNCTIONS_URL}/routePatient`, {
       method: "POST",
@@ -217,6 +233,7 @@ export async function routePatient(predictionResult) {
       body: JSON.stringify({ prediction: predictionResult }),
       signal: AbortSignal.timeout(5000),
     });
+
     if (response.ok) {
       const result = await response.json();
       return { ...result, source: "firebase-functions" };
@@ -224,9 +241,14 @@ export async function routePatient(predictionResult) {
   } catch (err) {
     console.warn("Firebase Functions unavailable, using fallback:", err.message);
   }
+
+  // Fallback: local routing
   return fallbackRoute(predictionResult);
 }
 
+/**
+ * Fallback routing using local scoring (always works offline).
+ */
 async function fallbackRoute(predictionResult) {
   await DELAY();
 
@@ -251,8 +273,8 @@ async function fallbackRoute(predictionResult) {
   });
 
   hospitals.sort((a, b) => b.routingScore - a.routingScore);
-  const recommended = hospitals[0];
 
+  const recommended = hospitals[0];
   const rejected = hospitals
     .filter((h) => h.routingScore < 20)
     .map((h) => ({
@@ -264,36 +286,13 @@ async function fallbackRoute(predictionResult) {
       ].filter(Boolean),
     }));
 
-  const reasons = [];
-  if (predictionResult?.severity?.level >= 3) {
-    reasons.push("Patient classified as high-severity requiring immediate intervention");
-  }
-  if (predictionResult?.icuNeeded && recommended.icuAvailable > 0) {
-    reasons.push(`ICU bed available (${recommended.icuAvailable}/${recommended.icuTotal})`);
-  }
-  if (predictionResult?.ventilatorNeeded && recommended.ventilatorAvailable > 0) {
-    reasons.push(`Ventilator available (${recommended.ventilatorAvailable}/${recommended.ventilatorTotal})`);
-  }
-  if (recommended.load < 60) {
-    reasons.push(`Low hospital load (${recommended.load}%)`);
-  }
-  reasons.push(`Distance: ${recommended.distance} km (ETA: ${recommended.eta} min)`);
-  reasons.push(`Trauma Level ${recommended.traumaLevel} facility`);
+  const explanation = generateExplanation(recommended, predictionResult);
 
   return {
     hospitals: hospitals.map((h, i) => ({ ...h, isRecommended: i === 0, rank: i + 1 })),
     recommended,
     rejected,
-    explanation: {
-      summary: `Patient routed to ${recommended.name} due to optimal resource availability and proximity.`,
-      reasons,
-      hospitalCapabilities: {
-        icuAvailable: recommended.icuAvailable > 0,
-        ventilatorAvailable: recommended.ventilatorAvailable > 0,
-        specialistAvailable: recommended.specialties.length > 2,
-        traumaLevel: recommended.traumaLevel,
-      },
-    },
+    explanation,
     routeInfo: {
       origin: { lat: 18.515, lng: 73.856 },
       destination: { lat: recommended.lat, lng: recommended.lng },
@@ -305,8 +304,43 @@ async function fallbackRoute(predictionResult) {
   };
 }
 
+function generateExplanation(hospital, prediction) {
+  const reasons = [];
+  if (prediction?.severity?.level >= 3) {
+    reasons.push("Patient classified as high-severity requiring immediate intervention");
+  }
+  if (prediction?.icuNeeded && hospital.icuAvailable > 0) {
+    reasons.push(`ICU bed available (${hospital.icuAvailable}/${hospital.icuTotal})`);
+  }
+  if (prediction?.ventilatorNeeded && hospital.ventilatorAvailable > 0) {
+    reasons.push(`Ventilator available (${hospital.ventilatorAvailable}/${hospital.ventilatorTotal})`);
+  }
+  if (hospital.load < 60) {
+    reasons.push(`Low hospital load (${hospital.load}%)`);
+  }
+  reasons.push(`Distance: ${hospital.distance} km (ETA: ${hospital.eta} min)`);
+  reasons.push(`Trauma Level ${hospital.traumaLevel} facility`);
+
+  return {
+    summary: `Patient routed to ${hospital.name} due to optimal resource availability and proximity.`,
+    reasons,
+    hospitalCapabilities: {
+      icuAvailable: hospital.icuAvailable > 0,
+      ventilatorAvailable: hospital.ventilatorAvailable > 0,
+      specialistAvailable: hospital.specialties.length > 2,
+      traumaLevel: hospital.traumaLevel,
+    },
+  };
+}
+
 // ─── notifyHospital ──────────────────────────────────────────
+/**
+ * Notify hospital about incoming patient.
+ * Tries Firebase Functions, falls back to local mock.
+ * No booking is stored (per user requirement).
+ */
 export async function notifyHospital(hospitalId, patientData, bookingData) {
+  // Try Firebase Functions
   try {
     const response = await fetch(`${FUNCTIONS_URL}/notifyHospital`, {
       method: "POST",
@@ -320,6 +354,7 @@ export async function notifyHospital(hospitalId, patientData, bookingData) {
       }),
       signal: AbortSignal.timeout(5000),
     });
+
     if (response.ok) {
       const result = await response.json();
       return { ...result, source: "firebase-functions" };
@@ -328,6 +363,7 @@ export async function notifyHospital(hospitalId, patientData, bookingData) {
     console.warn("Firebase Functions unavailable, using fallback:", err.message);
   }
 
+  // Fallback: local mock
   await DELAY();
   return {
     success: true,
@@ -341,4 +377,4 @@ export async function notifyHospital(hospitalId, patientData, bookingData) {
   };
 }
 
-export { DEMO_HOSPITALS };
+export { DEMO_HOSPITALS, calculateSeverityFromVitals, getSeverityLevel };

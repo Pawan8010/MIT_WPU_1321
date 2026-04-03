@@ -1,6 +1,6 @@
 /**
  * Firebase initialization — GoldenHour Emergency Triage System
- * Using Ignisia Firebase project credentials.
+ * Connected to Ignisia Firebase project.
  */
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, doc, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
@@ -22,16 +22,16 @@ try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   auth = getAuth(app);
-  console.log('[Firebase] Initialized successfully — project:', firebaseConfig.projectId);
+  console.log('[Firebase] Initialized — project:', firebaseConfig.projectId);
 } catch (error) {
-  console.warn('[Firebase] Initialization failed, running in demo mode:', error.message);
+  console.warn('[Firebase] Init failed, demo mode:', error.message);
   db = null;
   auth = null;
 }
 
 export { app, db, auth };
 
-// ─── Patient operations ──────────────────────────────────────
+// Patient operations
 export const savePatient = async (patientData) => {
   if (!db) {
     console.log('[Demo] Saving patient:', patientData);
@@ -51,10 +51,7 @@ export const savePatient = async (patientData) => {
 };
 
 export const getPatients = async () => {
-  if (!db) {
-    console.log('[Demo] Fetching patients');
-    return [];
-  }
+  if (!db) return [];
   try {
     const q = query(collection(db, 'patients'), orderBy('createdAt', 'desc'), limit(50));
     const snap = await getDocs(q);
@@ -65,12 +62,8 @@ export const getPatients = async () => {
   }
 };
 
-// ─── Hospital operations ─────────────────────────────────────
 export const getHospitals = async () => {
-  if (!db) {
-    console.log('[Demo] Fetching hospitals');
-    return [];
-  }
+  if (!db) return [];
   try {
     const snap = await getDocs(collection(db, 'hospitals'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));

@@ -7,14 +7,14 @@ import {
 import './Sidebar.css';
 
 const navItems = [
-  { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'emt-form', path: '/emt-form', label: 'EMT Form', icon: ClipboardList },
-  { id: 'prediction', path: '/prediction', label: 'Prediction', icon: Brain },
-  { id: 'hospital-routing', path: '/hospital-routing', label: 'Hospital Routing', icon: Building2 },
-  { id: 'map', path: '/map', label: 'Map Dashboard', icon: Map },
-  { id: 'xai', path: '/xai', label: 'XAI Panel', icon: Lightbulb },
-  { id: 'mass-casualty', path: '/mass-casualty', label: 'Mass Casualty', icon: AlertTriangle },
-  { id: 'settings', path: '/settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'dashboard', path: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'emt-form', path: '/app/emt-form', label: 'EMT Form', icon: ClipboardList },
+  { id: 'prediction', path: '/app/prediction', label: 'Prediction', icon: Brain },
+  { id: 'hospital-routing', path: '/app/hospital-routing', label: 'Hospital Routing', icon: Building2 },
+  { id: 'map', path: '/app/map', label: 'Map Dashboard', icon: Map },
+  { id: 'xai', path: '/app/xai', label: 'XAI Panel', icon: Lightbulb },
+  { id: 'mass-casualty', path: '/app/mass-casualty', label: 'Mass Casualty', icon: AlertTriangle },
+  { id: 'settings', path: '/app/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export default function Sidebar() {
@@ -27,7 +27,7 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${massCasualtyMode ? 'mci-mode' : ''}`}>
       {/* Logo */}
-      <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
+      <div className="sidebar-logo" onClick={() => navigate('/app/dashboard')}>
         <div className="logo-icon">
           <Heart size={22} strokeWidth={2.5} />
           <Activity size={14} className="logo-pulse" />

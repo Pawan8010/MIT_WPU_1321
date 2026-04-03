@@ -1,13 +1,33 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useStore from '../../store/useStore';
-import { Search, Bell, User, Save, CheckCircle, Menu, AlertTriangle } from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
+import { Search, Bell, User, Save, CheckCircle, Menu, AlertTriangle, LogOut } from 'lucide-react';
 import './Header.css';
 
 export default function Header() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthContext();
   const { lastSaved, autoSaveEnabled, triggerAutoSave, massCasualtyMode, notifications, alerts } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
+
+  // Get display name from Firebase user or demo session
+  const demoUser = sessionStorage.getItem("gh_demo_user");
+  const displayName = user?.displayName || (demoUser ? JSON.parse(demoUser).displayName : "EMT User");
+  const displayEmail = user?.email || (demoUser ? JSON.parse(demoUser).email : "");
+
+  const handleLogout = async () => {
+    try {
+      sessionStorage.removeItem("gh_demo_user");
+      await logout();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      navigate("/login");
+    }
+  };
 
   // Auto-save simulation
   useEffect(() => {
@@ -70,9 +90,18 @@ export default function Header() {
               <User size={16} />
             </div>
             <div className="profile-info">
-              <span className="profile-name">Dr. Sharma</span>
+              <span className="profile-name">{displayName}</span>
               <span className="profile-role">EMT Lead</span>
             </div>
+          </button>
+
+          <button
+            className="header-btn"
+            onClick={handleLogout}
+            title="Sign Out"
+            style={{ color: '#64748B' }}
+          >
+            <LogOut size={18} />
           </button>
         </div>
 
