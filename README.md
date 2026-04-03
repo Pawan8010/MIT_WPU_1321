@@ -1,267 +1,188 @@
-# MIT_WPU_1321
-
-
-forms
-
-
-# HC03 Complete Data Fields (All Graded)
+# HC03 Patient Assessment Form
 
 ---
 
-## PATIENT DEMOGRAPHICS
+## Patient Info
 
-| Field | Type | Input |
-|-------|------|-------|
-| **Age** | Continuous | ___ years |
-| **Gender** | Categorical | ☐ Male  ☐ Female |
-| **Pregnancy Status** | Categorical | ☐ Not Pregnant  ☐ Pregnant (__ weeks) |
-
----
-
-## VITAL SIGNS (Continuous Values)
-
-| Field | Input | Field | Input |
-|-------|-------|-------|-------|
-| **Pain Level (1-10)** | ___ /10 | **Heart Rate** | ___ bpm |
-| **GCS Total** | ___ /15 | **Systolic BP** | ___ mmHg |
-| **Respiratory Rate** | ___ /min | **SpO2** | ___ % |
-| **Body Temperature** | ___ . _ °C | **Blood Glucose** | ___ mg/dL |
-| **Time Since Symptom Onset** | ___ minutes | | |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 1 | **Age** | Continuous | ___ years |
+| 2 | **Gender** | Categorical | ☐ Male  ☐ Female |
+| 3 | **Pregnancy_Status** | 0/1 | ☐ No  ☐ Yes |
 
 ---
 
-## PRIMARY ASSESSMENT (Graded 0-5)
+## Vital Signs
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Airway Status** | [___] |
-| **Airway Sounds** | [___] |
-| **Breathing Difficulty** | [___] |
-| **Breathing Sounds** | [___] |
-| **Circulation** | [___] |
-| **Capillary Refill** | [___] |
-| **Disability (GCS Grade)** | [___] |
-| **Pupils** | [___] |
-| **Movement** | [___] |
-| **Skin Circulation** | [___] |
-| **Exposure/Injury Severity** | [___] |
-| **Hypothermia Risk** | [___] |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 4 | **Pain_Level** | 0-5 | ___ /5 |
+| 5 | **Breathing_Difficulty** | 0-5 | ___ /5 |
+| 6 | **GCS** | Continuous | ___ /15 |
+| 7 | **Heart_Rate** | 0-5 | ___ /5 |
+| 8 | **Blood_Pressure** | 0-5 | ___ /5 |
+| 9 | **Respiratory_Rate** | 0-5 | ___ /5 |
+| 10 | **SpO2** | 0-5 | ___ /5 |
+| 11 | **Body_Temperature** | Continuous | ___ . _ °C |
+| 12 | **Blood_Glucose** | Continuous | ___ mg/dL |
 
 ---
 
-## RESPIRATORY SYMPTOMS (Graded 0-5)
+## Assessment
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Shortness of Breath** | [___] |
-| **Breathing Difficulty** | [___] |
-| **Wheezing** | [___] |
-| **Coughing** | [___] |
-
----
-
-## CARDIAC SYMPTOMS (Graded 0-5)
-
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Chest Pain** | [___] |
-| **Palpitations** | [___] |
-| **Sweating** | [___] |
-| **Pain Radiation** | [___] |
-| **Pulse Deficit** | [___] |
-| **ECG Result** | ☐ Normal  ☐ STEMI  ☐ ST Depression  ☐ Arrhythmia |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 13 | **Bleeding_Severity** | 0-5 | ___ /5 |
+| 14 | **Skin_Circulation** | 0-5 | ___ /5 |
+| 15 | **Capillary_Refill** | 0-5 | ___ /5 |
 
 ---
 
-## NEUROLOGICAL SYMPTOMS (Graded 0-5)
+## Neurological
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Seizure** | [___] |
-| **Confusion** | [___] |
-| **Slurred Speech** | [___] |
-| **Vision Changes** | [___] |
-| **Facial Droop** | [___] |
-| **Arm Weakness** | [___] |
-| **Numbness/Tingling** | [___] |
-| **Loss of Consciousness** | [___] |
-| **Headache** | [___] |
-| **Dizziness** | [___] |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 16 | **Seizure** | 0-5 | ___ /5 |
+| 17 | **Slurred_Speech** | 0-5 | ___ /5 |
+| 18 | **Vision_Changes** | 0-5 | ___ /5 |
+| 19 | **Facial_Droop** | 0-5 | ___ /5 |
+| 20 | **Arm_Weakness** | 0-5 | ___ /5 |
+| 21 | **Numbness_Tingling** | 0-5 | ___ /5 |
 
 ---
 
-## GASTROINTESTINAL SYMPTOMS (Graded 0-5)
+## Cardiac
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Abdominal Pain** | [___] |
-| **Abdominal Tenderness** | [___] |
-| **Abdominal Hardness** | [___] |
-| **Nausea/Vomiting** | [___] |
-
----
-
-## TRAUMA ASSESSMENT (Graded 0-5)
-
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Mechanism of Injury** | [___] |
-| **Trauma Score** | [___] |
-| **Injury Severity** | [___] |
-| **C-Spine Injury Suspected** | [___] |
-| **Extremity Deformity** | [___] |
-
-**Injury Location (Mark all):**
-| ☐ Head | ☐ Face | ☐ Neck | ☐ Chest |
-| ☐ Abdomen | ☐ Pelvis | ☐ R-Arm | ☐ L-Arm |
-| ☐ R-Leg | ☐ L-Leg | ☐ Back | ☐ Spine |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 22 | **Chest_Pain** | 0-5 | ___ /5 |
+| 23 | **ECG_Result** | Categorical | ☐ Normal  ☐ STEMI  ☐ ST Depression  ☐ Arrhythmia |
+| 24 | **Pulse_Deficit** | 0-5 | ___ /5 |
 
 ---
 
-## BLEEDING (Graded 0-5)
+## Respiratory
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Bleeding Severity** | [___] |
-| **Bleeding Control Status** | [___] |
-
----
-
-## BURNS ASSESSMENT (Graded 0-5)
-
-| Field | Input | Grade |
-|-------|-------|:-----:|
-| **Burn Type** | ☐ Thermal  ☐ Chemical  ☐ Electrical  ☐ Radiation | |
-| **Burn Degree** | ☐ 1st  ☐ 2nd  ☐ 3rd  ☐ 4th | [___] |
-| **Burn Percentage** | ___ % | [___] |
-| **Smoke Inhalation** | ☐ No  ☐ Yes | [___] |
-| **Airway Involvement** | ☐ No  ☐ Yes | [___] |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 25 | **Shortness_of_Breath** | 0-5 | ___ /5 |
+| 26 | **Airway_Status** | 0-5 | ___ /5 |
+| 27 | **Airway_Sounds** | 0-5 | ___ /5 |
+| 28 | **Breathing_Sounds** | 0-5 | ___ /5 |
 
 ---
 
-## BODY EXAMINATION (Graded 0-5)
+## Gastrointestinal
 
-| Field | Grade (0-5) | | Field | Grade (0-5) |
-|-------|:-----------:|--|----------|:-----------:|
-| **Head/Neck Abnormality** | [___] | | **Chest Abnormality** | [___] |
-| **Pelvis Abnormality** | [___] | | **Skin Issues** | [___] |
-| **R-Arm Injury** | [___] | | **L-Arm Injury** | [___] |
-| **R-Leg Injury** | [___] | | **L-Leg Injury** | [___] |
-| **Back/Spine Injury** | [___] | | | |
-
----
-
-## GENERAL SYMPTOMS (Graded 0-5)
-
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Weakness** | [___] |
-| **Fatigue** | [___] |
-| **Fever** | [___] |
-| **Chills** | [___] |
-| **Severe Pain** | [___] |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 29 | **Abdominal_Pain** | 0-5 | ___ /5 |
+| 30 | **Abdominal_Tenderness** | 0-5 | ___ /5 |
+| 31 | **Abdominal_Hardness** | 0-5 | ___ /5 |
+| 32 | **Nausea_Vomiting** | 0-5 | ___ /5 |
 
 ---
 
-## MEDICAL HISTORY (Graded 0-5)
+## Trauma
 
-| Condition | Grade (0-5) |
-|-----------|:-----------:|
-| **Heart Disease** | [___] |
-| **High Blood Pressure** | [___] |
-| **Previous Heart Attack** | [___] |
-| **Stroke/TIA** | [___] |
-| **Diabetes** | [___] |
-| **Asthma/COPD** | [___] |
-| **Kidney Disease** | [___] |
-| **Seizures** | [___] |
-| **Bleeding Disorder** | [___] |
-| **Cancer** | [___] |
-
-**Allergies:** _____________________________
-
-**Medications:** _____________________________
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 33 | **Injury_Severity** | 0-5 | ___ /5 |
+| 34 | **Trauma_Score** | 0-5 | ___ /5 |
+| 35 | **Mechanism_of_Injury** | Categorical | ☐ None  ☐ Fall  ☐ Vehicle  ☐ Assault  ☐ Sports |
+| 36 | **C_Spine_Injury** | 0-5 | ___ /5 |
+| 37 | **Extremity_Deformity** | 0-5 | ___ /5 |
 
 ---
 
-## PEDIATRIC (If Age < 18)
+## Burns
 
-| Field | Input |
-|-------|-------|
-| **Age Group** | ☐ Neonate  ☐ Infant  ☐ Toddler  ☐ Child  ☐ Adolescent |
-| **Pediatric Assessment** | [___] |
-
----
-
-## OBSTETRIC (If Pregnant)
-
-| Field | Input | Grade |
-|-------|-------|:-----:|
-| **Weeks Pregnant** | ___ weeks | |
-| **Contractions?** | ☐ Yes  ☐ No | [___] |
-| **Water Broken?** | ☐ Yes  ☐ No | [___] |
-| **Bleeding?** | ☐ None  ☐ Spotting  ☐ Moderate  ☐ Heavy | [___] |
-| **Fetal Movement** | ☐ Normal  ☐ Decreased  ☐ Absent | [___] |
-| **High BP?** | ☐ No  ☐ Yes | [___] |
-| **Obstetric Danger Signs** | | [___] |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 38 | **Burn_Percentage** | Continuous | ___ % |
+| 39 | **Burn_Degree** | Categorical | ☐ 1st  ☐ 2nd  ☐ 3rd  ☐ 4th |
+| 40 | **Smoke_Inhalation** | 0-5 | ___ /5 |
 
 ---
 
-## STROKE ASSESSMENT (If Applicable)
+## Physical Exam
 
-| Test | Finding | Grade |
-|------|---------|:-----:|
-| **Face** | ☐ Normal  ☐ Drooping | [___] |
-| **Arm** | ☐ Normal  ☐ One drifts | [___] |
-| **Speech** | ☐ Normal  ☐ Slurred | [___] |
-
-**Last Known Well Time:** _________________
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 41 | **Head_Neck_Abnormality** | 0-5 | ___ /5 |
+| 42 | **Chest_Abnormality** | 0-5 | ___ /5 |
+| 43 | **Skin_Issues** | 0-5 | ___ /5 |
 
 ---
 
-## RESPONSE & OUTCOME (Graded 0-5)
+## General Symptoms
 
-| Field | Grade (0-5) |
-|-------|:-----------:|
-| **Response to Treatment** | [___] |
-| **Overall Patient Condition** | [___] |
-| **EMT Clinical Judgment** | [___] |
-
----
-
-## GRADING REFERENCE
-
-| Grade | Meaning |
-|:-----:|---------|
-| **0** | None/Normal |
-| **1** | Minimal |
-| **2** | Mild |
-| **3** | Moderate |
-| **4** | Severe |
-| **5** | Critical |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 44 | **Weakness** | 0-5 | ___ /5 |
+| 45 | **Fatigue** | 0-5 | ___ /5 |
+| 46 | **Fever** | 0-5 | ___ /5 |
+| 47 | **Chills** | 0-5 | ___ /5 |
+| 48 | **Dizziness** | 0-5 | ___ /5 |
+| 49 | **Headache** | 0-5 | ___ /5 |
 
 ---
 
-## TL;DR Complete Data Fields List
+## Additional
 
-| Category | Fields |
-|----------|---------|
-| **Demographics** | Age, Gender, Pregnancy Status |
-| **Vitals (Continuous)** | Pain, GCS, HR, BP, RR, SpO2, Temp, Glucose, Time |
-| **Primary (Graded)** | Airway, Breathing, Circulation, GCS, Pupils, Movement, Skin, Injury |
-| **Respiratory (Graded)** | SOB, Breathing Difficulty, Wheeze, Cough |
-| **Cardiac (Graded)** | Chest Pain, Palpitations, Sweating, ECG |
-| **Neurological (Graded)** | Seizure, Confusion, Speech, Vision, Weakness, Numbness |
-| **GI (Graded)** | Abdominal Pain, Tenderness, Hardness, N/V |
-| **Trauma (Graded)** | Mechanism, Score, Injury, C-Spine, Deformity |
-| **Bleeding (Graded)** | Severity, Control |
-| **Burns (Graded)** | Degree, %, Inhalation, Airway |
-| **Exam (Graded)** | Head, Chest, Arms, Legs, Back, Skin |
-| **General (Graded)** | Weakness, Fatigue, Fever, Pain |
-| **History (Graded)** | Heart Disease, Diabetes, etc. |
-| **Pediatric** | Age Group, Assessment |
-| **Obstetric** | Weeks, Contractions, Bleeding, Fetal |
-| **Stroke** | FAST assessment |
-| **Outcome** | Response, Overall Condition, EMT Judgment |
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 50 | **Hypothermia_Risk** | 0-5 | ___ /5 |
+| 51 | **Pupils** | 0-5 | ___ /5 |
+| 52 | **Movement** | 0-5 | ___ /5 |
 
-**All fields are now either Continuous, Categorical, or Graded (0-5) - ready for HC03 severity model**
+---
+
+## Response & Condition
+
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 53 | **Response_to_Treatment** | 0-5 | ___ /5 |
+| 54 | **Overall_Patient_Condition** | 0-5 | ___ /5 |
+| 55 | **EMT_Clinical_Judgment** | 0-5 | ___ /5 |
+
+---
+
+## Time
+
+| # | Field | Type | Input |
+|---|-------|------|-------|
+| 56 | **Time_Since_Symptom_Onset** | Continuous | ___ minutes |
+
+---
+
+## Submit
+
+```
+┌──────────────────────────┐
+│   📤 SUBMIT ASSESSMENT   │
+└──────────────────────────┘
+```
+
+---
+
+## TL;DR
+
+**Total: 56 Fields**
+
+| Category | Count |
+|----------|:-----:|
+| Patient Info | 3 |
+| Vital Signs | 9 |
+| Assessment | 3 |
+| Neurological | 6 |
+| Cardiac | 3 |
+| Respiratory | 4 |
+| Gastrointestinal | 4 |
+| Trauma | 5 |
+| Burns | 3 |
+| Physical Exam | 3 |
+| General Symptoms | 6 |
+| Additional | 3 |
+| Response & Condition | 3 |
+| Time | 1 |
