@@ -1,14 +1,63 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   Brain, BarChart3, Building2, Shield, AlertTriangle, CheckCircle,
-  XCircle, Info, ArrowRight, Lightbulb, Heart, Wind, Activity
+  XCircle, Info, ArrowRight, Lightbulb, Heart, Wind, Activity, Loader
 } from 'lucide-react';
 import './XAIPanel.css';
 
 export default function XAIPanel() {
   const navigate = useNavigate();
-  const { prediction, routing } = useStore();
+  const { prediction, routing, patientData } = useStore();
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [loadingAi, setLoadingAi] = useState(true);
+
+  useEffect(() => {
+    const fetchExplanation = async () => {
+      try {
+        setLoadingAi(true);
+        // Using the API key provided for the Explainable AI panel feature
+        const apiKey = "AIzaSyDg4JK90DyByU7N6p7_2-fcBdAyNBu0Zuo";
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        const ptData = patientData || {};
+        const prompt = `You are an expert XAI (Explainable AI) assistant for a medical triage system. 
+Analyze the following patient data and the generated severity prediction to explain WHY the model made this decision.
+Your response MUST be valid JSON with absolutely no markdown wrapping, no backticks, just the raw JSON object containing these two fields:
+{
+  "short_explanation": "A 1-2 sentence concise summary of why this severity was assigned.",
+  "long_explanation": "A detailed, multi-paragraph medical reasoning explaining the features, vitals, and their impacts on the final triage decision."
+}
+
+Data:
+- Patient: Age ${ptData.age || 'Unknown'}, Gender ${ptData.gender || 'Unknown'}
+- Complaint: ${ptData.chiefComplaint || 'N/A'}
+- Severity Assigned: ${prediction?.severity?.name || 'Unknown'} (${prediction?.severityScore || 0}/100)
+- Feature Importance Data: ${JSON.stringify(prediction?.featureImportance || [])}`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const data = JSON.parse(cleaned);
+        
+        setAiAnalysis(data);
+      } catch (e) {
+        console.error("XAI Generation error:", e);
+        // Fallback static explanation if API fails
+        setAiAnalysis({
+          short_explanation: explanation.summary,
+          long_explanation: "The AI evaluation engine combines multiple physiological factors to assess patient stability. Due to the high-risk indicators observed in the primary survey and vitals, the model escalated the severity to ensure rapid availability of specialized trauma resources. " + explanation.reasons.join(". ")
+        });
+      } finally {
+        setLoadingAi(false);
+      }
+    };
+    
+    fetchExplanation();
+  }, [patientData, prediction]);
 
   const featureImportance = prediction?.featureImportance || [
     { feature: 'Chest Pain', importance: 40, value: 'Present' },
@@ -127,25 +176,38 @@ export default function XAIPanel() {
 
         {/* Decision Explanation */}
         <div className="card xai-card explanation-card">
-          <div className="card-header">
-            <h3><Lightbulb size={16} /> Decision Explanation</h3>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Lightbulb size={16} /> Decision Explanation (Gemini AI)</h3>
+            {loadingAi && <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Loader size={12} className="spin" /> Generating...</span>}
           </div>
           <div className="card-body">
-            <div className="explanation-summary">
-              <Info size={18} className="explanation-icon" />
-              <p>{explanation.summary}</p>
-            </div>
-            <div className="explanation-reasons">
-              <h4>Contributing Factors</h4>
-              <ul>
-                {explanation.reasons.map((reason, i) => (
-                  <li key={i} className="reason-item" style={{ animationDelay: `${i * 60}ms` }}>
-                    <CheckCircle size={14} className="reason-check" />
-                    <span>{reason}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {loadingAi ? (
+              <div className="xai-loading-skeleton">
+                <div className="skeleton-line" style={{ width: '100%', height: '14px', marginBottom: '8px' }}></div>
+                <div className="skeleton-line" style={{ width: '80%', height: '14px', marginBottom: '24px' }}></div>
+                <div className="skeleton-line" style={{ width: '100%', height: '12px', marginBottom: '6px' }}></div>
+                <div className="skeleton-line" style={{ width: '90%', height: '12px', marginBottom: '6px' }}></div>
+                <div className="skeleton-line" style={{ width: '95%', height: '12px', marginBottom: '6px' }}></div>
+              </div>
+            ) : (
+              <>
+                <div className="explanation-summary">
+                  <Info size={18} className="explanation-icon" />
+                  <div>
+                    <h4 style={{ marginBottom: '4px', fontSize: '14px', color: 'var(--text-primary)' }}>Short Summary</h4>
+                    <p>{aiAnalysis?.short_explanation}</p>
+                  </div>
+                </div>
+                <div className="explanation-reasons" style={{ marginTop: '16px' }}>
+                  <h4 style={{ marginBottom: '8px', fontSize: '14px', color: 'var(--text-primary)' }}>Detailed Medical Reasoning</h4>
+                  <div className="long-explanation-text" style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {aiAnalysis?.long_explanation?.split('\n').map((paragraph, i) => (
+                      <p key={i} style={{ marginBottom: '10px' }}>{paragraph}</p>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

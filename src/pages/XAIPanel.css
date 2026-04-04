@@ -255,3 +255,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* XAI Loading Skeleton */
+.xai-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.xai-loading-skeleton .skeleton-line {
+  background: linear-gradient(90deg, var(--bg-primary) 0%, rgba(200, 200, 200, 0.2) 50%, var(--bg-primary) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

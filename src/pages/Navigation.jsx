@@ -133,9 +133,24 @@ export default function Navigation() {
               <h3>{booking?.hospital?.name || "Target Hospital"}</h3>
               <p><MapPin size={12} /> {booking?.hospital?.address || "Navigation target initialized"}</p>
             </div>
-            <button className="btn-call">
-              <PhoneCall size={20} />
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                className="btn-call" 
+                title="Open in Google Maps"
+                onClick={() => {
+                  if (booking?.hospital) {
+                    const origin = userLocation ? `&origin=${userLocation.lat},${userLocation.lng}` : '';
+                    const url = `https://www.google.com/maps/dir/?api=1${origin}&destination=${booking.hospital.lat},${booking.hospital.lng}&travelmode=driving`;
+                    window.open(url, '_blank');
+                  }
+                }}
+              >
+                <Compass size={20} />
+              </button>
+              <button className="btn-call" title="Call Hospital">
+                <PhoneCall size={20} />
+              </button>
+            </div>
           </div>
 
           <div className="vitals-mini-panel">

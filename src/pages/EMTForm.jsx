@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store/useStore';
 import toast from 'react-hot-toast';
@@ -8,10 +8,101 @@ import {
   Wind, Heart, Brain, Eye, Thermometer, Activity, Stethoscope,
   Bone, Droplets, Zap, ClipboardCheck, ArrowRight, ArrowLeft, Save,
   User, Shield, Baby, Flame, Siren, Clock, FileText,
-  Ambulance, Cross, Pill, Gauge, Sparkles
+  Ambulance, Cross, Pill, Gauge, Sparkles, MapPin
 } from 'lucide-react';
 import './EMTForm.css';
 
+/* ═══════════════════════════════════════════
+   LOCATION PICKER (GOOGLE MAP TILES)
+   ═══════════════════════════════════════════ */
+function IncidentMapPicker({ value, onChange }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    let map;
+    let marker;
+    let isMounted = true;
+
+    const initMap = async () => {
+      const L = await import('leaflet');
+      await import('leaflet/dist/leaflet.css');
+
+      if (!mapRef.current || !isMounted) return;
+
+      const defaultLat = value?.lat || 18.5204;
+      const defaultLng = value?.lng || 73.8567;
+      
+      map = L.map(mapRef.current).setView([defaultLat, defaultLng], 14);
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '© Google Maps',
+        maxZoom: 20
+      }).addTo(map);
+
+      const customIcon = L.divIcon({
+        html: `<div style="background: #E11D48; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"></div>`,
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      marker = L.marker([defaultLat, defaultLng], { 
+        draggable: true,
+        icon: customIcon
+      }).addTo(map);
+
+      marker.on('dragend', function () {
+        const latlng = marker.getLatLng();
+        onChange({ lat: latlng.lat, lng: latlng.lng });
+      });
+
+      map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        onChange({ lat: e.latlng.lat, lng: e.latlng.lng });
+      });
+
+      mapInstanceRef.current = map;
+      markerRef.current = marker;
+
+      if (!value?.lat) {
+         if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(pos => {
+               if (mapInstanceRef.current && markerRef.current) {
+                  const posLat = pos.coords.latitude;
+                  const posLng = pos.coords.longitude;
+                  mapInstanceRef.current.setView([posLat, posLng], 14);
+                  markerRef.current.setLatLng([posLat, posLng]);
+                  onChange({ lat: posLat, lng: posLng });
+               }
+            }, () => {}, { enableHighAccuracy: true });
+         }
+      }
+    };
+
+    initMap();
+
+    return () => {
+      isMounted = false;
+      if (map) {
+        map.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div className="incident-map-picker" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div ref={mapRef} style={{ width: '100%', height: '300px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative', zIndex: 1 }} />
+      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <MapPin size={14} />
+        <span className="mono">{value?.lat ? `${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}` : 'Fetching location...'}</span>
+        <span style={{ opacity: 0.7 }}>— Drag pin or click map to set exact incident location.</span>
+      </div>
+    </div>
+  );
+}
 /* ═══════════════════════════════════════════
    EMERGENCY TYPE DEFINITIONS
    ═══════════════════════════════════════════ */
@@ -483,8 +574,8 @@ export default function EMTForm() {
             <div className="step-panel-header">
               <div className="step-panel-icon"><User size={22} /></div>
               <div>
-                <h3>Personal Details</h3>
-                <p>Patient demographics and identification</p>
+                <h3>Personal Details & Location</h3>
+                <p>Patient demographics and incident location</p>
               </div>
             </div>
             <div className="step-panel-body">
@@ -525,6 +616,16 @@ export default function EMTForm() {
                   <textarea className="input" rows={3} value={patientData.chiefComplaint || localData.chiefComplaint || ''}
                     onChange={(e) => updateField('chiefComplaint', e.target.value)}
                     placeholder="Describe the primary complaint or reason for emergency..." />
+                </div>
+              </div>
+
+              <div className="form-grid cols-1" style={{ marginTop: 24, marginBottom: 8 }}>
+                <div className="text-input-field">
+                  <label>Incident Location <span className="required">*</span></label>
+                  <IncidentMapPicker 
+                    value={localData.location || patientData.location} 
+                    onChange={(loc) => updateField('location', loc)} 
+                  />
                 </div>
               </div>
             </div>

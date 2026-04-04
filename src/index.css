@@ -406,3 +406,29 @@ html.dark .input {
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
 }
+
+/* Accessibility Focus States */
+:focus-visible {
+  outline: 3px solid var(--primary-500);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+}
+
+.btn:focus-visible, .input:focus-visible, a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5);
+  border-color: var(--primary-500);
+}
+
+/* Screen Reader Only text support */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
