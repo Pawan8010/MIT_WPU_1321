@@ -9,7 +9,6 @@ import {
 import './SceneUpload.css';
 import LiveCamera from '../components/LiveCamera';
 import ExplainPanel from '../components/ExplainPanel';
-import VoiceInput from '../components/VoiceInput';
 import { notifyHospital } from '../services/notifyService';
 
 export default function SceneUpload() {
@@ -22,7 +21,7 @@ export default function SceneUpload() {
   const [result, setResult] = useState(null);
   const [showLiveCamera, setShowLiveCamera] = useState(false);
 
-  const handlePredict = async (predictionData) => {
+  const handlePredict = async (predictionData, imageFile = null) => {
     // Basic fields
     const updatedResult = { ...predictionData };
     setResult(updatedResult);
@@ -33,6 +32,10 @@ export default function SceneUpload() {
     // Fetch Explainability data (SHAP/Grad-CAM)
     try {
         const formData = new FormData();
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        
         const ML_SERVICE_URL = import.meta.env.VITE_ML_SERVICE_URL || "/api-ml";
         const response = await fetch(`${ML_SERVICE_URL}/predict-explain`, {
             method: 'POST',
@@ -117,14 +120,32 @@ export default function SceneUpload() {
                  </button>
                  <label className="btn btn-secondary btn-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all cursor-pointer">
                    <Upload size={20} className="mr-2" /> Upload Photo
-                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                   <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                        const file = e.target.files[0];
                        if (file) {
-                           toast.success("Image selected for analysis! Starting simulation...");
-                           // simulate processing the uploaded image
-                           setTimeout(() => {
-                               handlePredict({ severity: 'HIGH', confidence: 0.95, is_critical: true });
-                           }, 1500);
+                           setAnalyzing(true);
+                           toast.loading("Analyzing image...", { id: "analyze" });
+                           const formData = new FormData();
+                           formData.append("image", file);
+                           try {
+                               const ML_SERVICE_URL = import.meta.env.VITE_ML_SERVICE_URL || "/api-ml";
+                               const res = await fetch(`${ML_SERVICE_URL}/predict-live`, {
+                                   method: "POST",
+                                   body: formData
+                               });
+                               if (res.ok) {
+                                   const data = await res.json();
+                                   toast.success("Image analyzed successfully!", { id: "analyze" });
+                                   handlePredict(data, file);
+                               } else {
+                                   toast.error("Analysis failed", { id: "analyze" });
+                               }
+                           } catch (err) {
+                               console.error(err);
+                               toast.error("Network error during analysis", { id: "analyze" });
+                           } finally {
+                               setAnalyzing(false);
+                           }
                        }
                    }} />
                  </label>
@@ -134,23 +155,6 @@ export default function SceneUpload() {
         )}
       </div>
 
-      <VoiceInput onSeverityDetected={(severity, text) => {
-        setPatientField('aiSeverity', severity);
-        setPatientField('isCritical', severity === 'HIGH');
-        setPatientField('clinicalNotes', text);
-        
-        if (severity === 'HIGH') {
-            toast.error('CRITICAL VOICE DETECTED: Auto-notifying network', {
-              icon: '🚨',
-              duration: 5000,
-              style: { background: '#991B1B', color: '#fff' }
-            });
-            notifyHospital('HOSP-001', severity, 15);
-            setTimeout(() => proceedToHospitals(), 2000);
-        } else if (severity === 'MEDIUM' || severity === 'LOW') {
-            toast.success(`Severity ${severity} detected. Ready for routing.`);
-        }
-      }} />
 
       <div className="info-grid mt-8">
         <div className="info-card">

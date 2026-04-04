@@ -4,7 +4,12 @@ from tensorflow.keras.preprocessing import image
 import os
 
 # Load model once
-model = load_model("model/emergency_model.h5")
+model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "model", "emergency_model.h5")
+try:
+    model = load_model(model_path)
+except Exception as e:
+    print(f"Warning: Could not load model from {model_path}. Error: {e}")
+    model = None
 
 classes = ['burn', 'trauma']
 

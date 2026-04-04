@@ -39,7 +39,7 @@ export default function useLivePrediction(videoRef, canvasRef, onPredict) {
                     setSeverity(data.severity);
                     setConfidence(data.confidence);
                     if (onPredict) {
-                        onPredict(data);
+                        onPredict(data, blob);
                     }
                 }
             } catch (err) {
