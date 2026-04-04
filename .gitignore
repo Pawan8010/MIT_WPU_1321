@@ -22,3 +22,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+**/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.env
+.venv
+
+# ML/Models
+*.pkl
+models/model.pkl
+**/models/*.pkl
+data/*.csv
+**/__pycache__/
+
+# OS
+Thumbs.db
+.DS_Store

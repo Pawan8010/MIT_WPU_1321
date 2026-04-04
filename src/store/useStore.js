@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { predictPatient, routePatient, notifyHospital } from '../services/api';
+import { buildFeatures } from '../utils/featureBuilder';
 
 const defaultPatientData = {
   // Patient Info
@@ -114,9 +115,51 @@ const useStore = create((set, get) => ({
   runPrediction: async () => {
     set({ predictionLoading: true });
     try {
-      const result = await predictPatient(get().patientData);
-      set({ prediction: result, predictionLoading: false });
-      return result;
+      const pData = get().patientData;
+      // map pData to match formData keys used by featureBuilder
+      const formData = {
+         pain: pData.pain,
+         spo2: pData.spo2,
+         bp: pData.systolicBP,
+         heartRate: pData.heartRate,
+         consciousness: pData.gcs,
+         bleeding: pData.bleeding === 'none' ? 0 : 5,
+         injury: pData.traumaMechanism ? 5 : 0,
+         overall: 5
+      };
+      const features = buildFeatures(formData);
+      const mlResult = await predictPatient(features);
+      
+      const COLOR_DETAILS = {
+        GREEN:  { level: 0, label: 'GREEN',  name: 'Minor',             color: '#059669' },
+        YELLOW: { level: 1, label: 'YELLOW', name: 'Delayed',            color: '#EAB308' },
+        ORANGE: { level: 2, label: 'ORANGE', name: 'Urgent',             color: '#D97706' },
+        RED:    { level: 3, label: 'RED',    name: 'Immediate',          color: '#DC2626' },
+        BLACK:  { level: 4, label: 'BLACK',  name: 'Deceased/Expectant', color: '#1F2937' }
+      };
+      
+      const PRIORITY_TO_COLOR = {
+        LOW:      'GREEN',
+        MODERATE: 'YELLOW',
+        HIGH:     'ORANGE',
+        EMERGENCY:'RED',
+        CRITICAL: 'BLACK'
+      };
+      
+      const colorKey = PRIORITY_TO_COLOR[mlResult.priority] || 'ORANGE';
+      const severity = COLOR_DETAILS[colorKey];
+      
+      const adaptedResult = {
+        severityScore: severity.level * 25,
+        severity: severity,
+        icuNeeded: mlResult.needs_icu,
+        ventilatorNeeded: mlResult.needs_ventilator,
+        featureImportance: [],
+        timestamp: new Date().toISOString()
+      };
+      
+      set({ prediction: adaptedResult, predictionLoading: false });
+      return adaptedResult;
     } catch (error) {
       set({ predictionLoading: false });
       throw error;
@@ -131,8 +174,7 @@ const useStore = create((set, get) => ({
     try {
       let prediction = get().prediction;
       if (!prediction) {
-        prediction = await predictPatient(get().patientData);
-        set({ prediction });
+        prediction = await get().runPrediction();
       }
       const result = await routePatient(prediction);
       set({ routing: result, routingLoading: false });

@@ -1,9 +1,10 @@
 /**
  * API Service — connects frontend to ML service and Firebase Functions.
  *
- * Each function first attempts the real API, and falls back to the
- * built-in demo logic if the service is unreachable.
+ * Each function first attempts the real ML API (FastAPI / emergency_triage_ml),
+ * and falls back to the built-in demo logic if the service is unreachable.
  */
+import { buildFeatures } from './featureBuilder.js';
 
 // ─── Configuration ───────────────────────────────────────────
 const ML_SERVICE_URL =
@@ -86,86 +87,107 @@ function buildFeatureImportance(patientData) {
   }));
 }
 
-// ─── predictPatient ──────────────────────────────────────────
-export async function predictPatient(patientData) {
-  // Try real ML service
-  try {
-    const features = [
-      parseFloat(patientData.heartRate) || 80,
-      parseFloat(patientData.spo2) || 98,
-      parseFloat(patientData.respiratoryRate) || 16,
-      parseFloat(patientData.systolicBP) || 120,
-      parseFloat(patientData.gcs) || 15,
-    ];
+// ─── severity color → level mapping (used by routing logic) ─────────────
+const COLOR_TO_LEVEL = { GREEN: 0, YELLOW: 1, ORANGE: 2, RED: 3, BLACK: 4 };
+const COLOR_DETAILS = {
+  GREEN:  { level: 0, label: 'GREEN',  name: 'Minor',             color: '#059669' },
+  YELLOW: { level: 1, label: 'YELLOW', name: 'Delayed',            color: '#EAB308' },
+  ORANGE: { level: 2, label: 'ORANGE', name: 'Urgent',             color: '#D97706' },
+  RED:    { level: 3, label: 'RED',    name: 'Immediate',          color: '#DC2626' },
+  BLACK:  { level: 4, label: 'BLACK',  name: 'Deceased/Expectant', color: '#1F2937' },
+};
 
-    const response = await fetch(`${ML_SERVICE_URL}/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features }),
-      signal: AbortSignal.timeout(5000),
+export async function predictPatient(features) {
+    const res = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ features })
     });
 
-    if (response.ok) {
-      const mlResult = await response.json();
-      const priorityMap = {
-        LOW: { level: 0, label: 'GREEN', name: 'Minor', color: '#059669' },
-        MODERATE: { level: 1, label: 'YELLOW', name: 'Delayed', color: '#EAB308' },
-        HIGH: { level: 2, label: 'ORANGE', name: 'Urgent', color: '#D97706' },
-        EMERGENCY: { level: 3, label: 'RED', name: 'Immediate', color: '#DC2626' },
-        CRITICAL: { level: 4, label: 'BLACK', name: 'Deceased/Expectant', color: '#1F2937' },
-      };
-      const severity = priorityMap[mlResult.priority] || priorityMap.MODERATE;
-      const severityScore = Math.round(mlResult.confidence * 100);
-
-      return {
-        severityScore,
-        severity,
-        icuNeeded: mlResult.needs_icu,
-        ventilatorNeeded: mlResult.needs_ventilator,
-        specialistNeeded: severity.level >= 2,
-        confidence: Math.round(mlResult.confidence * 100),
-        featureImportance: buildFeatureImportance(patientData),
-        timestamp: new Date().toISOString(),
-        modelVersion: "v2.4.1-golden-hour",
-        source: "ml-service",
-      };
+    if (!res.ok) {
+        throw new Error("ML API failed");
     }
-  } catch (err) {
-    console.warn("ML service unavailable, using fallback:", err.message);
-  }
 
-  // Fallback: local rule-based prediction
-  return fallbackPredict(patientData);
+    return res.json();
+}
+
+/** Build a human-readable recommendation string. */
+function _buildRecommendation(level, icu, vent) {
+  if (level >= 4) return 'CRITICAL: Immediate life-saving intervention required. Notify receiving hospital NOW.';
+  if (level >= 3) return 'EMERGENCY: Immediate intervention required.' + (icu ? ' ICU bed must be pre-booked.' : '');
+  if (level >= 2) return 'URGENT: Close monitoring required.' + (vent ? ' Prepare ventilator support.' : '');
+  if (level >= 1) return 'DELAYED: Patient stable. Standard care pathway. Monitor vitals.';
+  return 'LOW: Patient stable. Routine assessment and care.';
+}
+
+/** Build hospital capability tags from ML response. */
+function _buildCapabilities(ml) {
+  const caps = ['emergency_department'];
+  if (ml.needs_icu         || ml.needs_cardiac_icu) caps.push('icu');
+  if (ml.needs_ventilator)                          caps.push('ventilator_support');
+  if (ml.needs_ct)                                  caps.push('ct_scan');
+  if (ml.needs_mri)                                 caps.push('mri');
+  if (ml.needs_emergency_ot)                        caps.push('operating_theatre');
+  if (ml.needs_blood_bank)                          caps.push('blood_bank');
+  if (ml.needs_neurosurgeon)                        caps.push('neurosurgery');
+  if (ml.needs_cardiologist)                        caps.push('cardiology');
+  return caps;
 }
 
 async function fallbackPredict(patientData) {
   await DELAY();
 
   const vitals = {
-    heartRate: patientData.heartRate || 80,
-    spo2: patientData.spo2 || 98,
+    heartRate:       patientData.heartRate       || 80,
+    spo2:            patientData.spo2            || 98,
     respiratoryRate: patientData.respiratoryRate || 16,
-    systolicBP: patientData.systolicBP || 120,
-    gcs: patientData.gcs || 15,
-    pain: patientData.pain || 3,
-    temperature: patientData.temperature || 37,
-    glucose: patientData.glucose || 100,
+    systolicBP:      patientData.systolicBP      || 120,
+    gcs:             patientData.gcs             || 15,
+    pain:            patientData.pain            || 3,
+    temperature:     patientData.temperature     || 37,
+    glucose:         patientData.glucose         || 100,
   };
 
-  const score = calculateSeverityFromVitals(vitals);
+  const score    = calculateSeverityFromVitals(vitals);
   const severity = getSeverityLevel(score);
 
+  // derive resource flags from vitals
+  const icuNeeded        = score >= 55;
+  const ventilatorNeeded = vitals.spo2 < 90 || vitals.respiratoryRate > 28;
+  const severityLabel    = severity.name;
+  const colorKey         = severity.label;
+
   return {
-    severityScore: score,
+    severityScore:        score,
     severity,
-    icuNeeded: score >= 55,
-    ventilatorNeeded: vitals.spo2 < 90 || vitals.respiratoryRate > 28,
-    specialistNeeded: score >= 45,
-    confidence: Math.round(78 + Math.random() * 18),
-    featureImportance: buildFeatureImportance(patientData),
-    timestamp: new Date().toISOString(),
-    modelVersion: "v2.4.1-golden-hour",
-    source: "fallback",
+    icuNeeded,
+    ventilatorNeeded,
+    specialistNeeded:     score >= 45,
+    confidence:           Math.round(72 + Math.random() * 18),
+    featureImportance:    buildFeatureImportance(patientData),
+    timestamp:            new Date().toISOString(),
+    modelVersion:         'v3.0.0-fallback',
+    source:               'fallback',
+    // new fields (best-effort from vitals)
+    severityLabel,
+    severityColor:        colorKey,
+    priorityLevel:        score >= 60 ? 'P1' : score >= 40 ? 'P2' : score >= 20 ? 'P3' : 'P4',
+    triageCategory:       score >= 60 ? 'Immediate' : score >= 40 ? 'Delayed' : 'Minimal',
+    recommendation:       score >= 60
+                            ? 'Immediate intervention required. Notify receiving hospital.'
+                            : score >= 40
+                              ? 'Close monitoring required. Prepare for escalation.'
+                              : 'Patient is stable. Standard care pathway.',
+    hospitalCapabilities: icuNeeded ? ['icu', 'emergency_department'] : ['emergency_department'],
+    resources:            {},
+    requiresCT:           false, requiresMRI: false, requiresEmergencyOT: icuNeeded,
+    requiresBloodBank:    score >= 50, requiresOxygen: ventilatorNeeded,
+    requiresCardiacICU:   false, requiresNeurosurgeon: false,
+    requiresCardiologist: false, requiresPulmonologist: false,
+    requiresOrthopedic:   false, requiresPlasticSurgeon: false,
+    requiresObstetrician: false, requiresPediatrician: false,
   };
 }
 
