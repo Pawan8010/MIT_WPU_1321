@@ -6,3 +6,6 @@ joblib
 pandas
 numpy
 xgboost
+assemblyai
+python-multipart
+python-dotenv

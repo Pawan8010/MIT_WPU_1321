@@ -85,46 +85,82 @@ export default function SceneUpload() {
       </div>
 
       <div className="upload-container card glass p-6">
-        {showLiveCamera ? (
+        {result ? (
+           <div className="analysis-dashboard animate-scale-in">
+              <div className="flex justify-between items-center mb-6">
+                 <div className="flex items-center gap-3">
+                    <div className={`severity-indicator ${result.severity === 'HIGH' ? 'bg-red-500 shadow-red-500/50' : 'bg-orange-500'} w-4 h-4 rounded-full animate-pulse`} />
+                    <h3 className="text-xl font-bold tracking-tight">ANALYSIS DASHBOARD</h3>
+                 </div>
+                 <button className="btn btn-ghost btn-sm" onClick={() => { setResult(null); setShowLiveCamera(false); }}>
+                    <X size={18} /> New Analysis
+                 </button>
+              </div>
+
+              <div className="analysis-grid gap-6">
+                 {/* Main Preview/Visuals */}
+                 <div className="analysis-main">
+                    {showLiveCamera ? (
+                       <LiveCamera onPredict={handlePredict} onStop={() => setShowLiveCamera(false)} />
+                    ) : (
+                       <div className="static-preview-frame">
+                          <img src={previewUrl} alt="Analyzed Scene" className="w-full h-auto rounded-xl object-cover" />
+                          <div className="preview-overlay">
+                             <div className="badge badge-primary">STATIC ANALYSIS</div>
+                          </div>
+                       </div>
+                    )}
+                 </div>
+
+                 {/* Explanation Engine */}
+                 <div className="analysis-side">
+                    <ExplainPanel result={result} />
+                 </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 flex justify-center gap-4">
+                 <button className="btn btn-outline" onClick={() => { setResult(null); setShowLiveCamera(false); }}>
+                    <ArrowRight size={18} className="rotate-180" /> Recalibrate
+                 </button>
+                 <button className="btn btn-primary btn-lg shadow-lg hover:shadow-xl" onClick={proceedToHospitals}>
+                    Route to Best Hospital <ArrowRight size={18} className="ml-2" />
+                 </button>
+              </div>
+           </div>
+        ) : showLiveCamera ? (
           <div className="w-full">
              <LiveCamera 
                  onPredict={handlePredict} 
                  onStop={() => setShowLiveCamera(false)} 
              />
-             <ExplainPanel result={result} />
-             
-             {result && (
-                <div className="mt-6 flex justify-center">
-                    <button className="btn btn-primary btn-lg" onClick={proceedToHospitals}>
-                        Route to Best Hospital <ArrowRight size={18} />
-                    </button>
-                </div>
-             )}
           </div>
         ) : (
           <div className="dropzone-wrapper">
-            <div className="text-center p-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700">
+            <div className="text-center p-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50">
                <div className="flex justify-center mb-4">
-                  <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-full">
-                     <Camera size={48} className="text-blue-600 dark:text-blue-400" />
+                  <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                     <Camera size={44} className="text-blue-600 dark:text-blue-400" />
                   </div>
                </div>
-               <h3 className="text-2xl font-bold mb-2">Live AI Detection & Upload</h3>
-               <p className="text-gray-500 mb-6">Activate camera or upload a photo for real-time analysis.</p>
-               <div className="flex justify-center gap-4">
+               <h3 className="text-2xl font-bold mb-2">Patient Triage AI</h3>
+               <p className="text-gray-500 mb-8 max-w-md mx-auto">Upload a scene photo or use your device camera for real-time trauma classification and severity scoring.</p>
+               <div className="flex flex-wrap justify-center gap-4">
                  <button 
-                    className="btn btn-primary btn-lg open-camera-btn shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all" 
+                    className="btn btn-primary btn-lg px-8 shadow-xl hover:shadow-2xl transition-all" 
                     onClick={() => setShowLiveCamera(true)}
                  >
                    <Camera size={20} className="mr-2" /> Start Live Camera
                  </button>
-                 <label className="btn btn-secondary btn-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all cursor-pointer">
+                 <label className="btn btn-outline btn-lg px-8 cursor-pointer border-2">
                    <Upload size={20} className="mr-2" /> Upload Photo
                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                        const file = e.target.files[0];
                        if (file) {
+                           const pUrl = URL.createObjectURL(file);
+                           setPreviewUrl(pUrl);
                            setAnalyzing(true);
-                           toast.loading("Analyzing image...", { id: "analyze" });
+                           const toastId = toast.loading("Analyzing scene dynamics...");
+                           
                            const formData = new FormData();
                            formData.append("image", file);
                            try {
@@ -135,14 +171,14 @@ export default function SceneUpload() {
                                });
                                if (res.ok) {
                                    const data = await res.json();
-                                   toast.success("Image analyzed successfully!", { id: "analyze" });
+                                   toast.success("AI Analysis Complete!", { id: toastId });
                                    handlePredict(data, file);
                                } else {
-                                   toast.error("Analysis failed", { id: "analyze" });
+                                   toast.error("Analysis Failed", { id: toastId });
                                }
                            } catch (err) {
                                console.error(err);
-                               toast.error("Network error during analysis", { id: "analyze" });
+                               toast.error("Network Error", { id: toastId });
                            } finally {
                                setAnalyzing(false);
                            }

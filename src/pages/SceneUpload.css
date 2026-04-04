@@ -407,3 +407,68 @@
   background: #DC2626;
   transform: translateY(-2px);
 }
+
+/* Analysis Dashboard Layout */
+.analysis-dashboard {
+  width: 100%;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.analysis-dashboard h3 {
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.static-preview-frame {
+  position: relative;
+  width: 100%;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #000;
+}
+
+.static-preview-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-height: 500px;
+}
+
+.preview-overlay {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.severity-indicator {
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
