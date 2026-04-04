@@ -29,52 +29,74 @@ export default function MapDashboard() {
   const mapInstanceRef = useRef(null);
   const routeLayerRef = useRef(null);
   const markersRef = useRef([]);
+  const [nearbyHospitals, setNearbyHospitals] = useState([]);
+  const [selectedHospital, setSelectedHospital] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [etaCountdown, setEtaCountdown] = useState(null);
-  const [routeData, setRouteData] = useState(null);
-  const [directions, setDirections] = useState([]);
-  const [routeSummary, setRouteSummary] = useState(null);
-  const [activeDirection, setActiveDirection] = useState(0);
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
+  const [trafficEnabled, setTrafficEnabled] = useState(true);
 
-  const routeInfo = routing?.routeInfo;
-  const recommended = routing?.recommended;
+  const routeInfo = booking?.routeInfo || routing?.routeInfo;
+  const targetHospital = booking?.hospital || routing?.recommended;
+  const hospitalsToShow = routing?.hospitals || (nearbyHospitals.length > 0 ? nearbyHospitals : []);
 
-  // Get user's real location
+  // Continuous Real-Time GPS Tracking
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          });
-        },
-        () => {
-          // Fallback to Pune if geolocation denied
-          setUserLocation({ lat: 18.5204, lng: 73.8567 });
-        },
-        { enableHighAccuracy: true }
-      );
-    }
-  }, []);
+    if (!navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newCoords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading // useful for rotation
+        };
+        setUserLocation(newCoords);
+        
+        // If we are "Live", update the map center automatically
+        if (mapInstanceRef.current && !isNavigating) {
+           mapInstanceRef.current.panTo([newCoords.lat, newCoords.lng], { animate: true });
+        }
+      },
+      (err) => console.warn("GPS Watch Error:", err),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [isNavigating]);
+
+  // Auto-fetch hospitals if none exist
+  useEffect(() => {
+    const initHospitals = async () => {
+      if (routing?.hospitals) {
+        setNearbyHospitals(routing.hospitals);
+        return;
+      }
+      
+      let loc = userLocation || { lat: 18.5204, lng: 73.8567 }; // Default Pune
+      try {
+        const { fetchNearbyHospitals } = await import('../services/api');
+        const data = await fetchNearbyHospitals(loc.lat, loc.lng);
+        setNearbyHospitals(data);
+      } catch (e) {
+        console.error("Auto-fetch hospitals failed", e);
+      }
+    };
+    initHospitals();
+  }, [routing, userLocation]);
 
   // ETA Countdown
   useEffect(() => {
-    if (!routeSummary?.travelTimeInSeconds && !recommended?.eta) return;
-    let remaining = routeSummary?.travelTimeInSeconds || (recommended?.eta * 60);
+    if (!routeSummary?.travelTimeInSeconds && !targetHospital?.eta && !selectedHospital?.eta) return;
+    let remaining = routeSummary?.travelTimeInSeconds || (targetHospital?.eta * 60) || (selectedHospital?.eta * 60);
     setEtaCountdown(remaining);
     const interval = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(interval);
-        remaining = 0;
-      }
-      setEtaCountdown(remaining);
+      setEtaCountdown(prev => (prev > 1 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
-  }, [routeSummary, recommended?.eta]);
+  }, [routeSummary, targetHospital, selectedHospital]);
+
+  // Simulation state
+  const [simPos, setSimPos] = useState(0);
+  const simIntervalRef = useRef(null);
 
   // Fetch route from TomTom Routing API
   const fetchRoute = useCallback(async (origin, destination) => {
@@ -89,7 +111,7 @@ export default function MapDashboard() {
         const route = data.routes[0];
         const legs = route.legs || [];
         const points = legs.flatMap(leg =>
-          leg.points.map(p => [p.latitude, p.longitude])
+          leg.points.map(p => ({ lat: p.latitude, lng: p.longitude }))
         );
 
         const summary = route.summary;
@@ -104,7 +126,7 @@ export default function MapDashboard() {
             maneuver: inst.maneuver || inst.drivingSide || '',
             street: inst.street || '',
             travelTime: inst.travelTimeInSeconds || 0,
-            point: inst.point ? [inst.point.latitude, inst.point.longitude] : null,
+            point: inst.point ? { lat: inst.point.latitude, lng: inst.point.longitude } : null,
           }))
         );
         setDirections(allInstructions);
@@ -115,6 +137,38 @@ export default function MapDashboard() {
       return null;
     }
   }, []);
+
+  // START SIMULATION
+  const startSimulation = useCallback(() => {
+    if (!routeData || routeData.length === 0) return;
+    setIsNavigating(true);
+    setSimPos(0);
+    setActiveDirection(0);
+
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    
+    let step = 0;
+    simIntervalRef.current = setInterval(() => {
+      step += 1;
+      if (step >= routeData.length) {
+        clearInterval(simIntervalRef.current);
+        setIsNavigating(false);
+        return;
+      }
+      setSimPos(step);
+      
+      // Update directions sync
+      const currentPt = routeData[step];
+      const nextDirIndex = directions.findIndex((d, idx) => {
+        if (!d.point || idx <= activeDirection) return false;
+        // Check proximity (~50m)
+        const dist = Math.sqrt(Math.pow(d.point.lat - currentPt.lat, 2) + Math.pow(d.point.lng - currentPt.lng, 2));
+        return dist < 0.0005; 
+      });
+      if (nextDirIndex !== -1) setActiveDirection(nextDirIndex);
+      
+    }, 200); // simulation speed
+  }, [routeData, directions, activeDirection]);
 
   // Initialize TomTom Map with Leaflet
   useEffect(() => {
@@ -132,7 +186,7 @@ export default function MapDashboard() {
           zoomControl: false,
         });
 
-        // TomTom Vector Tile Layer (much higher quality than OSM)
+        // TomTom Vector Tile Layer
         L.tileLayer(
           `https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}&tileSize=512`,
           {
@@ -142,10 +196,17 @@ export default function MapDashboard() {
             zoomOffset: -1,
           }
         ).addTo(map);
+        // Traffic Layer
+        if (trafficEnabled) {
+          L.tileLayer(
+            `https://api.tomtom.com/traffic/map/4/tile/flow/relative0-dark/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}`,
+            { maxZoom: 22, opacity: 0.7 }
+          ).addTo(map);
+        }
 
         L.control.zoom({ position: 'topright' }).addTo(map);
 
-        // Ambulance marker with pulse animation
+        // Ambulance marker 
         const ambulanceIcon = L.divIcon({
           html: `<div class="map-marker ambulance-marker">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
@@ -159,82 +220,75 @@ export default function MapDashboard() {
           iconAnchor: [22, 22],
         });
 
-        const ambulanceMarker = L.marker([origin.lat, origin.lng], { icon: ambulanceIcon })
+        const currentCoords = (isNavigating && routeData?.[simPos]) ? routeData[simPos] : origin;
+        const ambulanceMarker = L.marker([currentCoords.lat, currentCoords.lng], { icon: ambulanceIcon, zIndexOffset: 1000 })
           .addTo(map)
-          .bindPopup('<b>🚑 Ambulance</b><br>Current Location');
+          .bindPopup('<b>🚑 Ambulance</b><br>Live Tracking Active');
         markersRef.current.push(ambulanceMarker);
 
         // Hospital markers
-        if (routing?.hospitals) {
-          routing.hospitals.forEach(h => {
-            const isRec = h.isRecommended;
-            const hospitalIcon = L.divIcon({
-              html: `<div class="map-marker hospital-marker ${isRec ? 'recommended' : ''}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-                  <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-                  <path d="M12 6v4"/><path d="M10 8h4"/>
-                </svg>
-              </div>`,
-              className: 'custom-div-icon',
-              iconSize: [36, 36],
-              iconAnchor: [18, 18],
-            });
-
-            const marker = L.marker([h.lat, h.lng], { icon: hospitalIcon })
-              .addTo(map)
-              .bindPopup(`<b>${isRec ? '⭐ ' : ''}${h.name}</b><br>Load: ${h.load}% | ETA: ${h.eta} min`);
-            markersRef.current.push(marker);
+        hospitalsToShow.forEach(h => {
+          const isTarget = h.id === targetHospital?.id || selectedHospital?.id === h.id;
+          const hospitalIcon = L.divIcon({
+            html: `<div class="map-marker hospital-marker ${isTarget ? 'recommended' : ''}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
+                <path d="M12 6v4M10 8h4"/>
+              </svg>
+            </div>`,
+            className: 'custom-div-icon',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
           });
 
-          // Fetch real TomTom route to recommended hospital
-          const recHospital = routing.hospitals.find(h => h.isRecommended);
-          if (recHospital) {
-            const dest = { lat: recHospital.lat, lng: recHospital.lng };
-            const routeResult = await fetchRoute(origin, dest);
+          const marker = L.marker([h.lat, h.lng], { icon: hospitalIcon })
+            .addTo(map)
+            .on('click', () => {
+              setSelectedHospital(h);
+              fetchRoute(currentCoords, { lat: h.lat, lng: h.lng });
+            });
+            
+          marker.bindTooltip(`<b>${h.name}</b>`, { permanent: false, direction: 'top' });
+          markersRef.current.push(marker);
+        });
 
-            if (routeResult && routeResult.points.length > 0) {
-              // Draw real route polyline
-              const routeLine = L.polyline(routeResult.points, {
-                color: '#2563EB',
-                weight: 5,
-                opacity: 0.9,
-                lineCap: 'round',
-                lineJoin: 'round',
-              }).addTo(map);
+        // Auto-select target if no route exists
+        if (!routeData && (targetHospital || hospitalsToShow[0])) {
+           const target = targetHospital || hospitalsToShow[0];
+           fetchRoute(origin, { lat: target.lat, lng: target.lng });
+        }
 
-              // Animated route glow
-              L.polyline(routeResult.points, {
-                color: '#60A5FA',
-                weight: 8,
-                opacity: 0.3,
-                lineCap: 'round',
-                lineJoin: 'round',
-              }).addTo(map);
+        // Draw Route
+        if (routeData && routeData.length > 0) {
+           const polylineData = routeData.map(p => [p.lat, p.lng]);
+           const routeLine = L.polyline(polylineData, {
+             color: '#2563EB',
+             weight: 5,
+             opacity: 0.9,
+             lineCap: 'round',
+             lineJoin: 'round',
+           }).addTo(map);
 
-              routeLayerRef.current = routeLine;
+           // Glowing tracer
+           L.polyline(polylineData, {
+             color: '#60A5FA',
+             weight: 8,
+             opacity: 0.2,
+             lineCap: 'round',
+             lineJoin: 'round',
+           }).addTo(map);
 
-              // Fit map bounds to route
-              const bounds = L.latLngBounds(routeResult.points);
-              map.fitBounds(bounds, { padding: [60, 60] });
-            }
-          }
-        } else if (routeInfo) {
-          // Fallback: use routeInfo if no hospitals
-          const dest = routeInfo.destination;
-          const routeResult = await fetchRoute(origin, dest);
-
-          if (routeResult && routeResult.points.length > 0) {
-            L.polyline(routeResult.points, {
-              color: '#2563EB',
-              weight: 5,
-              opacity: 0.9,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }).addTo(map);
-
-            const bounds = L.latLngBounds(routeResult.points);
-            map.fitBounds(bounds, { padding: [60, 60] });
-          }
+           routeLayerRef.current = routeLine;
+           
+           // If we just started, fit bounds
+           if (simPos === 0) {
+             map.fitBounds(routeLine.getBounds(), { padding: [60, 60] });
+           }
+           
+           // If navigating, follow the ambulance
+           if (isNavigating) {
+             map.panTo([currentCoords.lat, currentCoords.lng], { animate: true });
+           }
         }
 
         mapInstanceRef.current = map;
@@ -254,33 +308,43 @@ export default function MapDashboard() {
         markersRef.current = [];
       }
     };
-  }, [routing, userLocation, fetchRoute]);
+  }, [routing, userLocation, fetchRoute, isNavigating, routeData, simPos]);
 
   const formatCountdown = (seconds) => {
     if (seconds === null || seconds === undefined) return '--:--';
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    // If navigating, reduce ETA based on simPos
+    const totalSteps = routeData?.length || 1;
+    const progress = simPos / totalSteps;
+    const currentSeconds = Math.max(0, Math.round(seconds * (1 - progress)));
+    
+    const m = Math.floor(currentSeconds / 60);
+    const s = currentSeconds % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
   };
 
   const formatDistance = (meters) => {
     if (!meters && meters !== 0) return '--';
-    if (meters < 1000) return `${meters} m`;
-    return `${(meters / 1000).toFixed(1)} km`;
+    const totalSteps = routeData?.length || 1;
+    const remainingMeters = Math.max(0, Math.round(meters * (1 - (simPos / totalSteps))));
+    
+    if (remainingMeters < 1000) return `${remainingMeters} m`;
+    return `${(remainingMeters / 1000).toFixed(1)} km`;
   };
 
   const formatDuration = (seconds) => {
     if (!seconds) return '--';
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
+    const totalSteps = routeData?.length || 1;
+    const currentSeconds = Math.max(0, Math.round(seconds * (1 - (simPos / totalSteps))));
+    
+    if (currentSeconds < 60) return `${currentSeconds}s`;
+    const mins = Math.floor(currentSeconds / 60);
     if (mins < 60) return `${mins} min`;
     const hrs = Math.floor(mins / 60);
     return `${hrs}h ${mins % 60}m`;
   };
 
   const handleStartNavigation = () => {
-    setIsNavigating(true);
-    setActiveDirection(0);
+    startSimulation();
   };
 
   const handleRecenter = () => {

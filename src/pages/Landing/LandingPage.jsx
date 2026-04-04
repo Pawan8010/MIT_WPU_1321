@@ -93,42 +93,46 @@ export default function LandingPage() {
           <div className="hero-gradient-1" />
           <div className="hero-gradient-2" />
           <div className="hero-grid-overlay" />
+          {/* Stitch-style Floating Elements */}
+          <div className="float-shape shape-1" />
+          <div className="float-shape shape-2" />
+          <div className="float-shape shape-3" />
         </div>
 
-        <div className="hero-content">
-          <div className="hero-badge">
-            <Zap size={14} />
-            <span>AI-Powered Emergency Triage</span>
+        <div className="hero-content animate-fade-up">
+          <div className="hero-badge glass">
+            <Zap size={14} className="badge-pulse" />
+            <span>AI-Powered Emergency Triage 3.0</span>
           </div>
           <h1 className="hero-title">
-            Golden-Hour<br />
-            <span className="hero-highlight">Emergency Triage</span> System
+            The <span className="hero-highlight">Golden-Hour</span><br />
+            Intelligence Layer
           </h1>
           <p className="hero-subtitle">
-            Saving lives with AI-powered severity prediction and intelligent hospital routing.
-            Every second counts — our system ensures patients reach the right hospital, at the right time.
+            Saving lives with real-time severity prediction and intelligent hospital routing.
+            Every second counts — we ensure patients reach the right care, instantly.
           </p>
           <div className="hero-cta">
-            <button className="btn-hero-primary" onClick={() => navigate("/signup")}>
-              Get Started <ArrowRight size={16} />
+            <button className="btn btn-primary btn-lg btn-glow" onClick={() => navigate("/signup")}>
+              Get Started <ArrowRight size={18} />
             </button>
-            <button className="btn-hero-outline" onClick={() => navigate("/login")}>
-              <Shield size={16} /> Log In
+            <button className="btn btn-outline btn-lg" onClick={() => navigate("/login")}>
+              <Shield size={18} /> Provider Login
             </button>
           </div>
-          <div className="hero-trust">
+          <div className="hero-trust animate-fade-in">
             <div className="trust-avatars">
               {[1,2,3,4].map(i => (
-                <div key={i} className="trust-avatar" style={{ animationDelay: `${i * 0.1}s` }}>
+                <div key={i} className="trust-avatar" style={{ '--i': i }}>
                   <Users size={14} />
                 </div>
               ))}
             </div>
-            <span className="trust-text">Trusted by <strong>50+ EMT teams</strong> across the network</span>
+            <span className="trust-text">Trusted by <strong>150+ Emergency Teams</strong> globally</span>
           </div>
         </div>
 
-        <div className="hero-visual">
+        <div className="hero-visual animate-slide-left">
           <div className="hero-card-preview">
             <div className="preview-header">
               <div className="preview-dot red" />

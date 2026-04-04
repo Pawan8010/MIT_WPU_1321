@@ -104,4 +104,4 @@ export function useAppContext() {
   return ctx;
 }
 
-export default AppContext;
+export { AppContext };

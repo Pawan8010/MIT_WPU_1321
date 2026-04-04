@@ -116,19 +116,10 @@ const useStore = create((set, get) => ({
     set({ predictionLoading: true });
     try {
       const pData = get().patientData;
-      // map pData to match formData keys used by featureBuilder
-      const formData = {
-         pain: pData.pain,
-         spo2: pData.spo2,
-         bp: pData.systolicBP,
-         heartRate: pData.heartRate,
-         consciousness: pData.gcs,
-         bleeding: pData.bleeding === 'none' ? 0 : 5,
-         injury: pData.traumaMechanism ? 5 : 0,
-         overall: 5
-      };
-      const features = buildFeatures(formData);
-      const mlResult = await predictPatient(features);
+      
+      // Send the entire patient data object to the service
+      // The backend will now use the advanced XGBoost model
+      const mlResult = await predictPatient(pData);
       
       const COLOR_DETAILS = {
         GREEN:  { level: 0, label: 'GREEN',  name: 'Minor',             color: '#059669' },
@@ -150,17 +141,19 @@ const useStore = create((set, get) => ({
       const severity = COLOR_DETAILS[colorKey];
       
       const adaptedResult = {
-        severityScore: severity.level * 25,
+        severityScore: mlResult.score || (severity.level * 25),
         severity: severity,
         icuNeeded: mlResult.needs_icu,
         ventilatorNeeded: mlResult.needs_ventilator,
-        featureImportance: [],
-        timestamp: new Date().toISOString()
+        featureImportance: mlResult.details?.featureImportance || [], // Backend could provide this later
+        timestamp: new Date().toISOString(),
+        details: mlResult.details // Keep raw ML outputs for deeper analysis
       };
       
       set({ prediction: adaptedResult, predictionLoading: false });
       return adaptedResult;
     } catch (error) {
+      console.error("Prediction failed:", error);
       set({ predictionLoading: false });
       throw error;
     }
@@ -176,9 +169,60 @@ const useStore = create((set, get) => ({
       if (!prediction) {
         prediction = await get().runPrediction();
       }
-      const result = await routePatient(prediction);
-      set({ routing: result, routingLoading: false });
-      return result;
+      // 1. Get current geolocation coordinates
+      let coords = { lat: 18.5204, lng: 73.8567 }; // Default: Pune
+      try {
+        const getPosition = () => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000 }));
+        const pos = await getPosition();
+        coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      } catch (e) { console.warn("Geolocation failed, using default coords"); }
+
+      // 2. Fetch real hospitals using TomTom Search
+      const { fetchNearbyHospitals } = await import('../services/api');
+      const realHospitals = await fetchNearbyHospitals(coords.lat, coords.lng);
+
+      // 3. Attempt Backend Routing first
+      let routingResult;
+      try {
+        routingResult = await routePatient(prediction);
+        // Overwrite with real ones if backend returned mocked data
+        if (!routingResult.hospitals || routingResult.hospitals.length <= 5) {
+          if (realHospitals.length > 0) {
+            routingResult.hospitals = realHospitals.map((h, i) => ({ ...h, isRecommended: i === 0, rank: i + 1 }));
+            routingResult.recommended = realHospitals[0];
+            routingResult.routeInfo = {
+                origin: coords,
+                destination: { lat: realHospitals[0].lat, lng: realHospitals[0].lng },
+                eta: realHospitals[0].eta,
+                distance: realHospitals[0].distance
+            };
+          }
+        }
+      } catch (error) {
+        console.warn("Backend routing failed, using real-time TomTom fallback");
+        if (realHospitals.length === 0) throw new Error("No hospitals found nearby.");
+        
+        const best = realHospitals[0];
+        routingResult = {
+          hospitals: realHospitals.map((h, i) => ({ ...h, isRecommended: i === 0, rank: i + 1 })),
+          recommended: best,
+          rejected: [],
+          explanation: {
+            summary: `Patient routed to ${best.name} based on real-time TomTom proximity data.`,
+            reasons: ["Real-time distance match"]
+          },
+          routeInfo: {
+            origin: coords,
+            destination: { lat: best.lat, lng: best.lng },
+            eta: best.eta,
+            distance: best.distance
+          },
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      set({ routing: routingResult, routingLoading: false });
+      return routingResult;
     } catch (error) {
       set({ routingLoading: false });
       throw error;
